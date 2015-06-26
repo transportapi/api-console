@@ -12,9 +12,12 @@
       setPromise(ramlParser.load(raml));
     };
 
+
     var onParseSuccess = function(cb) {
       ramlProcessor = function() {
-        cb.apply(this, arguments);
+        var parsed = Array.prototype.slice.apply(arguments);
+
+        cb.apply(this, parsed);
         if (!$rootScope.$$phase) {
           // handle aggressive digesters!
           $rootScope.$digest();
