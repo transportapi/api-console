@@ -134,6 +134,7 @@
           $scope.resourceList = [];
           $scope.documentList = [];
 
+
           for (var i = 0; i < $scope.raml.resourceGroups.length; i++) {
             var resources = $scope.raml.resourceGroups[i];
             var status = resources.length > 1 ? false : null;
