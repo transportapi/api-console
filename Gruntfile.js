@@ -303,6 +303,11 @@ module.exports = function (grunt) {
     'watch'
   ]);
 
+  grunt.registerTask('serveit', [
+    'connect:livereload',
+    'watch'
+  ]);
+
   grunt.registerTask('build', [
     'jshint',
     'clean',
