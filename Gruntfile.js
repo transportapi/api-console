@@ -44,7 +44,7 @@ module.exports = function (grunt) {
     connect: {
       options: {
         hostname: '0.0.0.0',
-        port:     9000
+        port:     9555
       },
 
       livereload: {
@@ -208,7 +208,7 @@ module.exports = function (grunt) {
     watch: {
       dist: {
         options: {
-          livereload: true
+          livereload: 9565
         },
 
         tasks: [],
@@ -299,6 +299,11 @@ module.exports = function (grunt) {
 
   grunt.registerTask('default', [
     'build',
+    'connect:livereload',
+    'watch'
+  ]);
+
+  grunt.registerTask('serveit', [
     'connect:livereload',
     'watch'
   ]);
