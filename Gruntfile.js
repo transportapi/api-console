@@ -11,7 +11,7 @@ module.exports = function (grunt) {
       js: ['src/**/*.js'],
       jsVendor: [
         'bower_components/marked/lib/marked.js',
-        'bower_components/raml-js-parser/dist/raml-parser.js',
+        'bower_components/raml-1-parser/raml-1-parser.js',
         'bower_components/highlightjs/highlight.pack.js',
         'bower_components/vkbeautify/vkbeautify.js',
         'bower_components/jquery/dist/jquery.js',
@@ -30,10 +30,13 @@ module.exports = function (grunt) {
         'bower_components/angular-ui-codemirror/ui-codemirror.js',
         'bower_components/angular-marked/angular-marked.js',
         'bower_components/angular-highlightjs/angular-highlightjs.js',
+        'bower_components/angular-sanitize/angular-sanitize.js',
         'bower_components/jszip/jszip.js',
         'bower_components/slug/slug.js',
         'bower_components/FileSaver/FileSaver.js',
-        'bower_components/raml-client-generator/dist/raml-client-generator.js'
+        'bower_components/raml-client-generator/dist/raml-client-generator.js',
+        'bower_components/resolve-url/resolve-url.js',
+        'bower_components/js-traverse/traverse.js'
       ],
       html: ['src/index.html'],
       scss: ['src/scss/light-theme.scss', 'src/scss/dark-theme.scss'],
@@ -173,6 +176,14 @@ module.exports = function (grunt) {
         'build:styles'
       ],
 
+      dist: [
+        'build:scripts:dist',
+        'concat:vendor',
+        'concat:index',
+        'copy:assets',
+        'build:styles'
+      ],
+
       themes: [
         'concat:darkTheme',
         'concat:lightTheme'
@@ -183,7 +194,8 @@ module.exports = function (grunt) {
       build: {
         options: {
           sourcemap: 'none',
-          style:     'expanded'
+          style:     'expanded',
+          defaultEncoding: 'UTF-8'
         },
 
         files: {
@@ -195,7 +207,8 @@ module.exports = function (grunt) {
       min: {
         options: {
           sourcemap: 'none',
-          style:     'compressed'
+          style:     'compressed',
+          defaultEncoding: 'UTF-8'
         },
 
         files: {
@@ -273,7 +286,8 @@ module.exports = function (grunt) {
 
     jshint: {
       options: {
-        jshintrc: true
+        jshintrc: true,
+        reporterOutput: ''
       },
 
       files: [
@@ -282,6 +296,19 @@ module.exports = function (grunt) {
         '<%= src.test %>',
         '!src/vendor/**/*.js'
       ]
+    },
+
+    uglify: {
+      options: {
+        mangle:   false,
+        compress: true
+      },
+      min: {
+        files: {
+          '<%= distdir %>/scripts/<%= pkg.name %>.min.js': ['<%= distdir %>/scripts/<%= pkg.name %>.js'],
+          '<%= distdir %>/scripts/<%= pkg.name %>-vendor.min.js': ['<%= distdir %>/scripts/<%= pkg.name %>-vendor.js']
+        }
+      }
     },
 
     protractor: {
@@ -314,9 +341,21 @@ module.exports = function (grunt) {
     'concurrent:build'
   ]);
 
+  grunt.registerTask('dist', [
+    'jshint',
+    'clean',
+    'concurrent:dist'
+  ]);
+
   grunt.registerTask('build:scripts', [
     'ngtemplates',
     'concat:app'
+  ]);
+
+  grunt.registerTask('build:scripts:dist', [
+    'ngtemplates',
+    'concat:app',
+    'uglify:min'
   ]);
 
   grunt.registerTask('build:styles', [

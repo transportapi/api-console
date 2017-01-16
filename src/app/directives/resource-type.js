@@ -4,15 +4,15 @@
   RAML.Directives.resourceType = function() {
     return {
       restrict: 'E',
-      templateUrl: 'resources/resource-type.tpl.html',
+      templateUrl: 'directives/resource-type.tpl.html',
       replace: true,
-      controller: function ($scope) {
+      controller: ['$scope', function ($scope) {
         var resourceType = $scope.resource.resourceType;
 
         if (typeof resourceType === 'object') {
           $scope.resource.resourceType = Object.keys(resourceType).join();
         }
-      }
+      }]
     };
   };
 

@@ -29,6 +29,21 @@
   var NamedParameters = function(plain, parameterized) {
     this.plain = copy(plain);
     this.parameterized = parameterized;
+    Object.keys(this.plain).forEach(function (key) {
+      var data = this.plain[key].definitions[0];
+
+      if (typeof data['enum'] !== 'undefined') {
+        if (!data.required) {
+          var temp = [''];
+          data['enum'] = temp.concat(data['enum']);
+        }
+      }
+
+      if (key.charAt(0) === '$') {
+        var tempKey = '&#36;' + key.substring(1);
+        this.plain[tempKey] = this.plain[key];
+      }
+    }.bind(this));
 
     Object.keys(parameterized || {}).forEach(function(key) {
       parameterized[key].created = [];
@@ -43,7 +58,7 @@
   NamedParameters.prototype.clear = function (info) {
     var that = this;
     Object.keys(this.values).map(function (key) {
-      if (typeof info[key][0].enum === 'undefined' || info[key][0].overwritten === true) {
+      if (typeof info[key][0]['enum'] === 'undefined' || info[key][0].overwritten === true) {
         that.values[key] = [''];
       }
     });
@@ -54,12 +69,16 @@
     if (info) {
       Object.keys(info).map(function (key) {
         if (typeof field === 'undefined' || field === key) {
-          if (typeof info[key][0].enum === 'undefined') {
+          if (typeof info[key][0]['enum'] === 'undefined') {
             if (info[key][0].type === 'date' && typeof info[key][0].example === 'object') {
               info[key][0].example = info[key][0].example.toUTCString();
             }
 
-            that.values[key][0] = info[key][0].example;
+            if (info[key][0].example) {
+              that.values[key][0] = info[key][0].example;
+            } else if (info[key][0].examples && info[key][0].examples[0] && info[key][0].examples[0].value) {
+              that.values[key][0] = info[key][0].examples[0].value;
+            }
           }
         }
       });

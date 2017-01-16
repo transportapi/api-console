@@ -11,6 +11,7 @@
 
   // Angular Modules
   angular.module('RAML.Directives', []);
+  angular.module('raml', []);
   angular.module('RAML.Services', ['raml']);
   angular.module('RAML.Security', []);
   angular.module('ramlConsoleApp', [
@@ -19,12 +20,13 @@
     'RAML.Security',
     'hc.marked',
     'ui.codemirror',
-    'hljs'
-  ]).config(function (hljsServiceProvider) {
+    'hljs',
+    'ngSanitize'
+  ]).config(['hljsServiceProvider', function (hljsServiceProvider) {
     hljsServiceProvider.setOptions({
       classPrefix: 'raml-console-hljs-'
     });
-  });
+  }]);
 
   var loc = window.location;
   var uri = loc.protocol + '//' + loc.host + loc.pathname.replace(/\/$/, '');

@@ -1,4 +1,4 @@
-  <form name="form" class="raml-console-sidebar" novalidate ng-class="{ 'raml-console-is-collapsed': singleView }">
+  <form name="form" class="raml-console-sidebar" novalidate ng-class="{ 'raml-console-is-collapsed': singleView }" ng-if="!disableTryIt" ng-init="setFormScope(this)">
     <div class="raml-console-sidebar-flex-wrapper">
       <div class="raml-console-sidebar-content">
         <header class="raml-console-sidebar-row raml-console-sidebar-header">
@@ -18,13 +18,13 @@
         </header>
 
         <div class="raml-console-sidebar-content-wrapper">
-          <section ng-if="raml.protocols.length > 1">
+          <section ng-if="protocols.length > 1">
             <header class="raml-console-sidebar-row raml-console-sidebar-subheader raml-console-sidebar-subheader-top">
               <h4 class="raml-console-sidebar-subhead">Protocols</h4>
             </header>
             <div class="raml-console-sidebar-row raml-console-sidebar-securty">
               <select ng-change="protocolChanged(currentProtocol)" class="raml-console-sidebar-input" ng-model="currentProtocol" style="margin-bottom: 0;">
-               <option ng-repeat="protocol in raml.protocols" value="{{protocol}}">{{protocol}}</option>
+               <option ng-repeat="protocol in protocols" value="{{protocol}}">{{protocol}}</option>
               </select>
             </div>
           </section>
@@ -33,10 +33,10 @@
             <header class="raml-console-sidebar-row raml-console-sidebar-subheader" ng-class="{'raml-console-sidebar-subheader-top':raml.protocols.length == 1}">
               <h4 class="raml-console-sidebar-subhead">Authentication</h4>
             </header>
-
             <div class="raml-console-sidebar-row raml-console-sidebar-securty">
               <div class="raml-console-toggle-group raml-console-sidebar-toggle-group">
                 <label class="raml-console-sidebar-label">Security Scheme</label>
+                <span class="raml-console-resource-param-instructional">Custom Security Schemes are not supported in Try It</span>
                 <select ng-change="securitySchemeChanged(currentScheme)" class="raml-console-sidebar-input" ng-model="currentScheme" style="margin-bottom: 0;">
                  <option ng-repeat="(key, scheme) in securitySchemes" value="{{scheme.id}}">{{scheme.name}}</option>
                 </select>
@@ -54,7 +54,27 @@
 
           <named-parameters src="methodInfo.headers.plain" context="context" type="headers" title="Headers" enable-custom-parameters></named-parameters>
 
-          <named-parameters src="methodInfo.queryParameters" context="context" type="queryParameters" title="Query Parameters" enable-custom-parameters></named-parameters>
+          <named-parameters src="methodInfo.queryParameters" context="context" type="queryParameters" types="types" title="Query Parameters" enable-custom-parameters></named-parameters>
+
+          <section ng-if="methodInfo.queryString">
+            <header class="raml-console-sidebar-row raml-console-sidebar-subheader">
+              <h4 class="raml-console-sidebar-subhead">Query String</h4>
+            </header>
+
+            <div class="raml-console-sidebar-row" style="padding-bottom: 0;">
+              <div
+                class="raml-console-resource-param-instructional"
+                ng-show="queryStringHasError"
+                style="color: red;">
+                  Query String format is invalid, JSON string expected
+              </div>
+              <div
+                class="raml-console-codemirror-body-editor"
+                ui-codemirror="{ lineNumbers: true, tabSize: 2, theme : 'raml-console', mode: context.bodyContent.selected }"
+                ng-model="context.queryString">
+              </div>
+            </div>
+          </section>
 
           <section id="sidebar-body" ng-if="methodInfo.body">
             <header class="raml-console-sidebar-row raml-console-sidebar-subheader">
@@ -81,11 +101,11 @@
                   <span class="raml-console-sidebar-input-tooltip-container" ng-if="param.definitions[0].description">
                     <button tabindex="-1" class="raml-console-sidebar-input-tooltip"><span class="raml-console-visuallyhidden">Show documentation</span></button>
                     <span class="raml-console-sidebar-tooltip-flyout">
-                      <span marked="param.definitions[0].description" opts="markedOptions"></span>
+                      <span markdown="param.definitions[0].description" class="raml-console-marked-content"></span>
                     </span>
                   </span>
 
-                  <raml-field param="param.definitions[0]" model="context.bodyContent.definitions[context.bodyContent.selected].values[param.definitions[0].id]"></raml-field>
+                  <raml-field context="context" type="type" types="types" param="param.definitions[0]" model="context.bodyContent.definitions[context.bodyContent.selected].values[param.definitions[0].id]"></raml-field>
                 </p>
               </div>
             </div>
@@ -93,6 +113,12 @@
 
           <section>
             <div class="raml-console-sidebar-row">
+              <span
+                class="raml-console-resource-param-instructional"
+                ng-show="customStrategyError"
+                style="color: red;">
+                  Custom Security Schemes are not supported in Try It
+              </span>
               <div class="raml-console-sidebar-action-group">
                 <button ng-hide="showSpinner" type="submit" class="raml-console-sidebar-action raml-console-sidebar-action-{{methodInfo.method}}" ng-click="tryIt($event)" ng-class="{'raml-console-sidebar-action-force':context.forceRequest}"><span ng-if="context.forceRequest">Force</span> {{methodInfo.method.toUpperCase()}}
                 </button>
@@ -118,8 +144,7 @@
                   <div ng-if="requestOptions.url">
                     <h3 class="raml-console-sidebar-response-head raml-console-sidebar-response-head-pre">Request URL</h3>
                     <div class="raml-console-sidebar-response-item">
-                      <p class="raml-console-sidebar-response-metadata raml-console-sidebar-request-url">{{requestOptions.baseUrl}}<span ng-repeat="(key, value) in parameters"><span ng-hide="$first">&amp;</span><b>{{key}}</b>=<i>{{value[0]}}</i></span>
-                      </p>
+                      <p class="raml-console-sidebar-response-metadata raml-console-sidebar-request-url">{{requestOptions.url}}</p>
                     </div>
                   </div>
 

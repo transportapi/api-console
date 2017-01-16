@@ -55,6 +55,20 @@ module.exports = function() {
       assert.ifResourceNameIsPresentAt('/resource2', 4);
     });
 
+    it('should be able to try security schema of type pass through', function () {
+      // Arrange
+      var po     = factory.create('initializer');
+      var assert = assertions.create('resource');
+
+      // Act
+      browser.get('http://localhost:9000');
+      po.setRamlPath('http://localhost:9000/raml/security-schema-pass-though.raml');
+      po.loadRamlFromUrl();
+
+      // Assert
+      assert.ifShowingSecuritySchemes(0, 0, ['Anonymous', 'OAuth 2.0']);
+    });
+
     it('should be able to display security schemes', function () {
       // Arrange
       var po     = factory.create('initializer');
@@ -145,6 +159,40 @@ module.exports = function() {
       // Assert
       assert.ifResourceNameIsPresentAt('/resources', 0);
       assert.ifShowingDefinedMethodsForResourceAt(0, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT']);
+    });
+
+    it('should be able to display falsy default values', function () {
+      // Arrange
+      var po     = factory.create('initializer');
+      var assert = assertions.create('resource');
+
+      // Act
+      browser.get('http://localhost:9000');
+      po.setRaml(po.examples['query-parameters']);
+      po.loadRaml();
+
+      // Assert
+      assert.ifResourceNameIsPresentAt('/resource', 0);
+      assert.ifShowingDefaultValueInQueryParameter(0, 0, 0);
+    });
+
+    it('should select enum example in Try It section', function () {
+      // Arrange
+      var po         = factory.create('initializer');
+      var assert     = assertions.create('resource');
+      var resourcePo = factory.create('resource');
+
+      // Act
+      browser.get('http://localhost:9000');
+      po.setRaml(po.examples['query-parameters']);
+      po.loadRaml();
+
+      resourcePo.toggleResourceMethod(0, 0);
+
+      // Assert
+      assert.ifResourceNameIsPresentAt('/resource', 0);
+      assert.ifTryItShowsParamExample(0, 1, 'true');
+      assert.ifTryItShowsParamExample(0, 5, 'dos');
     });
   });
 };
