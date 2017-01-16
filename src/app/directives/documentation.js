@@ -5,8 +5,8 @@
     return {
       restrict: 'E',
       templateUrl: 'directives/documentation.tpl.html',
-      replace: true,
-      controller: function($rootScope, $scope, $q, $http) {
+      controller: ['$rootScope', '$scope', '$q', '$http', function($rootScope, $scope, $q, $http) {
+
         var defaultSchemaKey = Object.keys($scope.securitySchemes).sort()[0];
         var defaultSchema    = $scope.securitySchemes[defaultSchemaKey];
 
@@ -150,6 +150,46 @@
         $scope.markedOptions = RAML.Settings.marked;
         $scope.documentationSchemeSelected = defaultSchema;
 
+        function mergeResponseCodes(methodCodes, schemas) {
+          var extractSchema = function (key) { return schemas.hasOwnProperty(key) ? schemas[key] : undefined; };
+          var isValidSchema = function (schema) { return schema.describedBy && schema.describedBy.responses; };
+
+          var codes = {};
+
+          // Copy all method codes
+          Object.keys(methodCodes).forEach(function (code) {
+            if (methodCodes.hasOwnProperty(code)) { codes[code] = methodCodes[code]; }
+          });
+
+          // Copy schema's code that are not present in the method
+          Object.keys(schemas)
+            .map(extractSchema)
+            .filter(isValidSchema)
+            .forEach(function (schema) {
+              copyToCodesIfNotPresent(codes, schema.describedBy.responses);
+            });
+
+          return codes;
+        }
+
+        function copyToCodesIfNotPresent(codes, schemaCodes) {
+          if (Array.isArray(schemaCodes)) {
+            schemaCodes.forEach(function (response) {
+              if (!codes.hasOwnProperty(response.code)) {
+                codes[response.code] = response.code;
+              }
+            });
+          } else {
+            Object.keys(schemaCodes).forEach(function (code) {
+              if (schemaCodes.hasOwnProperty(code) && !codes.hasOwnProperty(code)) {
+                codes[code] = schemaCodes[code];
+              }
+            });
+          }
+        }
+        $scope.fullResponses = mergeResponseCodes($scope.methodInfo.responses || {}, $scope.methodInfo.securitySchemes());
+        $scope.fullResponseCodes = Object.keys($scope.fullResponses);
+
         $scope.isSchemeSelected = function isSchemeSelected(scheme) {
           return scheme.id === $scope.documentationSchemeSelected.id;
         };
@@ -174,8 +214,8 @@
 
         $scope.currentStatusCode = '200';
 
-        if ($scope.methodInfo.responseCodes && $scope.methodInfo.responseCodes.length > 0) {
-          $scope.currentStatusCode = $scope.methodInfo.responseCodes[0];
+        if ($scope.fullResponseCodes && $scope.fullResponseCodes.length > 0) {
+          $scope.currentStatusCode = $scope.fullResponseCodes[0];
         }
 
         function deepmerge(target, src) {
@@ -218,13 +258,19 @@
 
           return dst;
         }
+        
+        $scope.$on('resetData', function() {
+          if ($scope.fullResponseCodes && $scope.fullResponseCodes.length > 0) {
+            $scope.currentStatusCode = $scope.fullResponseCodes[0];
+          }
+        });
 
         function beautify(body, contentType) {
-          if(contentType.indexOf('json')) {
+          if(contentType.indexOf('json') !== -1) {
             body = vkbeautify.json(body, 2);
           }
 
-          if(contentType.indexOf('xml')) {
+          if(contentType.indexOf('xml') !== -1) {
             body = vkbeautify.xml(body, 2);
           }
 
@@ -235,7 +281,7 @@
           var result = value;
 
           try {
-            beautify(value, $scope.currentBodySelected);
+            result = beautify(value, $scope.currentBodySelected);
           }
           catch (e) { }
 
@@ -273,14 +319,14 @@
               result += 'required, ';
             }
 
-            if (parameter.enum) {
-              var enumValues = $scope.unique(parameter.enum);
+            if (parameter['enum']) {
+              var enumValues = $scope.unique(parameter['enum']);
 
               if (enumValues.length > 1) {
                 result += 'one of ';
               }
 
-              result += '(' + enumValues.join(', ') + ')';
+              result += '(' + enumValues.filter(function (value) { return value !== ''; }).join(', ') + ')';
 
             } else {
               result += parameter.type || '';
@@ -311,7 +357,7 @@
               result += ', repeatable';
             }
 
-            if (parameter['default']) {
+            if (parameter['default'] !== undefined) {
               result += ', default: ' + parameter['default'];
             }
           }
@@ -377,27 +423,8 @@
             });
           }
         });
-
-        $scope.showSchema = function ($event) {
-          var $this   = jQuery($event.currentTarget);
-          var $panel  = $this.closest('.raml-console-schema-container');
-          var $schema = $panel.find('.raml-console-resource-pre-toggle');
-
-          $this.toggleClass('raml-console-is-active');
-
-          if (!$schema.hasClass('raml-console-is-active')) {
-            $this.text('Hide Schema');
-            $schema
-              .addClass('raml-console-is-active')
-              .velocity('slideDown');
-          } else {
-            $this.text('Show Schema');
-            $schema
-              .removeClass('raml-console-is-active')
-              .velocity('slideUp');
-          }
-        };
-      }
+      }],
+      replace: true
     };
   };
 

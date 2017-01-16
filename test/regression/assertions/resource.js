@@ -33,6 +33,24 @@ function Resource (poName) {
     });
   };
 
+  this.ifBeAbleToTryIt = function (resource, method) {
+    var button = this.po.getMethodBtn(resource, method);
+    var schemes, securitySchemesCount;
+
+    button.click();
+
+    schemes              = this.po.getSecuritySchemes(resource);
+    securitySchemesCount = schemes.count();
+    expect(securitySchemesCount).toBe(1);
+
+
+    this.po.getTryItGetBtn(resource).click();
+
+    var errorMessages = this.po.getTryItErrorMessages(resource);
+    expect(errorMessages.count()).toBe(1);
+    expect(errorMessages.get(0).isDisplayed()).toBe(false);
+  };
+
   this.ifShowingSecuritySchemes = function (resource, method, expectedSchemes) {
     var button = this.po.getMethodBtn(resource, method);
     var schemes, securitySchemesCount;
@@ -49,6 +67,72 @@ function Resource (poName) {
         expect(schemes.get(i).getInnerHtml()).toBe(expectedSchemes[i]);
       }
     });
+  };
+
+  this.ifShowingSecuritySchemaHeaders = function (resource, method, expectedNOfHeaders, expectedHeaders) {
+    var button = this.po.getMethodBtn(resource, method);
+    button.click();
+
+    var headers = this.po.getSecuritySchemeHeaderTitles(resource);
+    var numberOfHeaders = headers.count();
+
+    expect(numberOfHeaders).toBe(expectedNOfHeaders);
+    for(var i = 0; i < expectedHeaders.length; i++) {
+      expect(headers.get(i).getInnerHtml()).toContain(expectedHeaders[i]);
+    }
+  };
+
+  this.ifCredentialsUpdateBetweenResources = function () {
+    var resourcesGetButton= this.po.getMethodBtn(0, 0);
+    var pageObject = this.po;
+
+    var userText = 'test';
+    var passwordText = 'pass';
+
+    //click Get on /resources and set the user/pass
+    resourcesGetButton.click();
+
+    var username = pageObject.getUsernameField();
+    username.sendKeys(userText);
+    var password = pageObject.getPasswordField();
+    password.sendKeys(passwordText);
+
+    //close button to ensure 'resource2' is on screen.
+    var closeButton = pageObject.getCloseBtn(0);
+    closeButton.click();
+
+    var resources2GetButton = pageObject.getMethodBtn(1, 0);
+
+    //click Get on /resources2 and ensure user/pass match
+    resources2GetButton.click();
+
+    var username2 = pageObject.getUsernameField();
+    expect(username2.getAttribute('value')).toBe(userText);
+    var password2 = pageObject.getPasswordField();
+    expect(password2.getAttribute('value')).toBe(passwordText);
+
+  };
+
+  this.ifShowingDefaultValueInQueryParameter = function (resource, method, queryParameterPosition) {
+    var button = this.po.getMethodBtn(resource, method);
+    button.click();
+
+    var queryParameters = this.po.getQueryParameterDetails(resource);
+    var queryParameter  = queryParameters.get(queryParameterPosition);
+
+    expect(queryParameter.getText()).toMatch(/default: false/);
+  };
+
+  this.ifTryItShowsParamExample = function (resource, queryParameterPosition, defaultValue) {
+    var input = this.po.getTryItQueryParameterInput(resource, queryParameterPosition);
+
+    expect(input.getAttribute('value')).toEqual(defaultValue);
+  };
+
+  this.ifShowsResponseExample = function (resource, expectedValue) {
+    var examples = this.po.getReponseExamples(resource);
+
+    expect(examples.getText()).toEqual(expectedValue);
   };
 }
 

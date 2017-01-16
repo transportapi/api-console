@@ -6,19 +6,23 @@
       restrict: 'E',
       templateUrl: 'directives/sidebar.tpl.html',
       replace: true,
-      controller: function ($scope, $location, $anchorScroll) {
+      controller: ['$scope', '$timeout', function ($scope, $timeout) {
         var defaultSchemaKey = Object.keys($scope.securitySchemes).sort()[0];
         var defaultSchema    = $scope.securitySchemes[defaultSchemaKey];
+        var defaultAccept    = 'application/json';
 
         $scope.markedOptions     = RAML.Settings.marked;
         $scope.currentSchemeType = defaultSchema.type;
         $scope.currentScheme     = defaultSchema.id;
         $scope.responseDetails   = false;
-        $scope.currentProtocol   = $scope.raml.protocols && $scope.raml.protocols.length ? $scope.raml.protocols[0] : null;
 
         function readCustomSchemeInfo (name) {
           if (!$scope.methodInfo.headers.plain) {
             $scope.methodInfo.headers.plain = {};
+          }
+
+          if (!$scope.methodInfo.queryParameters) {
+            $scope.methodInfo.queryParameters = {};
           }
 
           updateContextData('headers', name, $scope.methodInfo.headers.plain, $scope.context.headers);
@@ -74,7 +78,7 @@
         }
 
         function handleResponse(jqXhr, err) {
-          $scope.response.status = jqXhr ? jqXhr.status : err ? err.status : 0;
+          $scope.response.status = jqXhr ? jqXhr.status : err ? (err.status ? err.status : err.message) : 0;
 
           if (jqXhr) {
             $scope.response.headers = parseHeaders(jqXhr.getAllResponseHeaders());
@@ -82,8 +86,6 @@
             if ($scope.response.headers['content-type']) {
               $scope.response.contentType = $scope.response.headers['content-type'].split(';')[0];
             }
-
-            $scope.currentStatusCode = jqXhr.status.toString();
 
             try {
               $scope.response.body = beautify(jqXhr.responseText, $scope.response.contentType);
@@ -98,10 +100,6 @@
           $scope.showSpinner     = false;
           $scope.responseDetails = true;
 
-          var hash = 'request_' + $scope.generateId($scope.resource.pathSegments);
-          $location.hash(hash);
-          $anchorScroll();
-
           // If the response fails because of CORS, responseText is null
           var editorHeight = 50;
 
@@ -115,6 +113,24 @@
           };
 
           apply();
+
+          var hash = 'request_' + $scope.generateId($scope.resource.pathSegments);
+
+          $timeout(function () {
+            if (jqXhr) {
+              var $editors = jQuery('.raml-console-sidebar-content-wrapper .CodeMirror').toArray();
+
+              $editors.forEach(function (editor) {
+                var cm = editor.CodeMirror;
+                cm.setOption('mode', $scope.response.contentType);
+                cm.refresh();
+              });
+            }
+
+            jQuery('html, body').animate({
+              scrollTop: jQuery('#'+hash).offset().top + 'px'
+            }, 'fast');
+          }, 10);
         }
 
         function resolveSegementContexts(pathSegments, uriParameters) {
@@ -136,28 +152,13 @@
         }
 
         function validateForm(form) {
-          var errors    = form.$error;
-          // var uriParams = $scope.context.uriParameters.plain;
-          var flag      = false;
+          var keys = Object.keys(form.form).filter(function (key) { return key.indexOf('$') === -1;});
 
-          Object.keys(form.$error).map(function (key) {
-            for (var i = 0; i < errors[key].length; i++) {
-              var fieldName = errors[key][i].$name;
-              // var fieldValue = form[fieldName].$viewValue;
-
-              form[fieldName].$setViewValue(form[fieldName].$viewValue);
-
-              // Enforce request without URI parameters
-              // if (typeof uriParams[fieldName] !== 'undefined' && (typeof fieldValue === 'undefined' || fieldValue === '')) {
-              //   flag = true;
-              //   break;
-              // }
-            }
+          keys.forEach(function (fieldName) {
+            form.form[fieldName].$setDirty();
           });
 
-          if (flag) {
-            $scope.context.forceRequest = false;
-          }
+          return form.form.$valid;
         }
 
         function getParameters (context, type) {
@@ -165,8 +166,30 @@
           var customParameters = context.customParameters[type];
 
           if (!RAML.Utils.isEmpty(context[type].data())) {
-            params = context[type].data();
+            params = angular.copy(context[type].data());
           }
+
+          Object.keys(params).forEach(function (key) {
+            if (Array.isArray(params[key][0])) {
+              var input = angular.copy(params[key][0]);
+
+              input.forEach(function (each, index) {
+                params[key][index] = each[0];
+              });
+            }
+
+            params[key].forEach(function (param, index) {
+              if (typeof param === 'object') {
+                params[key][index] = JSON.stringify(
+                  RAML.Inspector.Properties.cleanupPropertyValue(params[key][index]));
+              }
+            });
+
+            // Remove empty array property
+            if (params[key][0] === '[null]') {
+              delete params[key];
+            }
+          });
 
           if (customParameters.length > 0) {
             for(var i = 0; i < customParameters.length; i++) {
@@ -190,17 +213,22 @@
           });
         }
 
+        $scope.$watch('methodInfo', function () {
+          $scope.protocols       = $scope.methodInfo.protocols || $scope.raml.protocols;
+          $scope.currentProtocol = $scope.protocols && $scope.protocols.length ? $scope.protocols[0] : null;
+        });
+
         $scope.$on('resetData', function() {
           var defaultSchemaKey = Object.keys($scope.securitySchemes).sort()[0];
           var defaultSchema    = $scope.securitySchemes[defaultSchemaKey];
 
           $scope.currentSchemeType           = defaultSchema.type;
           $scope.currentScheme               = defaultSchema.id;
-          $scope.currentProtocol             = $scope.raml.protocols[0];
+          $scope.protocols                   = $scope.methodInfo.protocols || $scope.raml.protocols;
+          $scope.currentProtocol             = $scope.protocols && $scope.protocols.length ? $scope.protocols[0] : null;
           $scope.documentationSchemeSelected = defaultSchema;
           $scope.responseDetails             = null;
-          // removeCustomSchemeData($scope.context.headers);
-          // removeCustomSchemeData($scope.context.queryParameters);
+
           cleanSchemeMetadata($scope.methodInfo.headers.plain, $scope.context.headers);
           cleanSchemeMetadata($scope.methodInfo.queryParameters, $scope.context.queryParameters);
         });
@@ -211,7 +239,11 @@
 
         $scope.prefillBody = function (current) {
           var definition   = $scope.context.bodyContent.definitions[current];
-          definition.value = definition.contentType.example;
+          definition.fillWithExample();
+
+          if (definition.value) {
+            definition.value = $scope.getBeatifiedExample(definition.value);
+          }
         };
 
         $scope.clearFields = function () {
@@ -360,23 +392,26 @@
           }
         };
 
+        $scope.setFormScope = function (form) {
+          $scope.form = form;
+        };
+
         $scope.tryIt = function ($event) {
           $scope.requestOptions  = null;
           $scope.responseDetails = false;
           $scope.response        = {};
 
-          validateForm($scope.form);
-
           if (!$scope.context.forceRequest) {
             jQuery($event.currentTarget).closest('form').find('.ng-invalid').first().focus();
           }
 
-          if($scope.context.forceRequest || $scope.form.$valid) {
+          if($scope.context.forceRequest || validateForm($scope.form)) {
             var url;
             var context         = $scope.context;
             var segmentContexts = resolveSegementContexts($scope.resource.pathSegments, $scope.context.uriParameters.data());
 
             $scope.showSpinner = true;
+            $scope.queryStringHasError = false;
             $scope.toggleRequestMetadata($event, true);
 
             try {
@@ -395,15 +430,39 @@
               client.baseUri = client.baseUri.replace(/(https)|(http)/, $scope.currentProtocol.toLocaleLowerCase());
               url = client.baseUri + pathBuilder(segmentContexts);
             } catch (e) {
+              console.error(e);
               $scope.response = {};
               return;
             }
-
             var request = RAML.Client.Request.create(url, $scope.methodInfo.method);
 
             $scope.parameters = getParameters(context, 'queryParameters');
 
+            if (context.queryString) {
+              var parameters;
+              try {
+                parameters = JSON.parse(context.queryString);
+              } catch (e) {
+                $scope.queryStringHasError = true;
+                $scope.response = {};
+
+                $scope.showSpinner = false;
+                return;
+              }
+              Object.keys(parameters).forEach(function (key) {
+                if (!$scope.parameters[key]) {
+                  $scope.parameters[key] = [];
+                }
+                var value = parameters[key];
+                if (typeof value === 'object') {
+                  value = JSON.stringify(value);
+                }
+                $scope.parameters[key].push(value);
+              });
+            }
+
             request.queryParams($scope.parameters);
+            request.header('Accept', $scope.raml.mediaType || defaultAccept);
             request.headers(getParameters(context, 'headers'));
 
             if (context.bodyContent) {
@@ -433,8 +492,7 @@
                 });
                 return;
               }
-
-              authStrategy = RAML.Client.AuthStrategies.for(scheme, $scope.credentials);
+              authStrategy = RAML.Client.AuthStrategies.forScheme(scheme, $scope.credentials);
               authStrategy.authenticate().then(function(token) {
                 token.sign(request);
                 $scope.requestOptions = request.toOptions();
@@ -446,7 +504,11 @@
 
               $scope.requestOptions = request.toOptions();
             } catch (e) {
-              // custom strategies aren't supported yet.
+              console.error(e);
+              $scope.customStrategyError = true;
+              $scope.response = {};
+
+              $scope.showSpinner = false;
             }
           } else {
             $scope.context.forceRequest = true;
@@ -590,7 +652,7 @@
         $scope.toggleResponseMetadata = function () {
           $scope.showResponseMetadata = !$scope.showResponseMetadata;
         };
-      }
+      }]
     };
   };
 

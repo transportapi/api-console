@@ -774,6 +774,10 @@
   }
 }
 
+.sidebar-input-tooltip-container-enum {
+  margin-right: 19px;
+}
+
 .sidebar-input-tooltip-container {
   position: absolute;
   right: 7px;
@@ -801,6 +805,8 @@
   color: $color-input-reset;
   font-weight: 900;
   transition: 0.3s ease color, 0.3s ease border-color;
+
+  z-index: 999;
 
   &:before {
     content: "i";

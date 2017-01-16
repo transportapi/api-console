@@ -16,7 +16,9 @@
    * @return {Boolean}
    */
   var toBoolean = function (value) {
-    return [0, false, '', '0', 'false'].indexOf(value) === -1;
+    if ([0, false, '0', 'false'].indexOf(value) !== -1) return false;
+    if ([1, true, '1', 'true'].indexOf(value) !== -1) return true;
+    return null;
   };
 
   /**
@@ -50,6 +52,68 @@
   var toDate = function (value) {
     return !isNaN(Date.parse(value)) ? new Date(value) : null;
   };
+
+  /**
+   * Returns the passed value unchanged.
+   */
+  var returnValue = function (value) {
+    return value;
+  };
+
+  var toUnion = function (value, key, object, configs) {
+    var any = null;
+    configs.forEach(function (config) {
+      config.unionTypes.forEach(function (type) {
+        any = any || TYPES[type](value, key, object, configs);
+      });
+    });
+
+    return any;
+  };
+
+  function isNativeType(typeName) {
+    typeName = typeName.replace('[]', '');
+    var nativeTypes = [
+      'object',
+      'string',
+      'number',
+      'integer',
+      'boolean',
+      'date-only',
+      'time-only',
+      'datetime-only',
+      'datetime',
+      'file',
+      'array'
+    ];
+    return nativeTypes.indexOf(typeName) !== -1;
+  }
+
+  function convertType(config) {
+    var newConfig = {};
+    // Clone config object.
+    Object.keys(config).forEach(function (key) {
+      newConfig[key] = config[key];
+    });
+
+    if (Array.isArray(newConfig.type)) {
+      newConfig.type = newConfig.type.map(function (aType) {
+        var newType = aType.replace('[]', '');
+        var parts = aType.split('|');
+        if (parts.length > 1) {
+          newType = 'union';
+          newConfig.unionTypes = parts.map(function (part) {
+            part = part.trim();
+            return !isNativeType(part) ? 'object' : part;
+          });
+        } else {
+          newType = !isNativeType(newType) ? 'object' : newType;
+        }
+        return newType;
+      });
+    }
+    return newConfig;
+  }
 
   /**
    * Convert the schema config into a single sanitization function.
@@ -93,7 +157,7 @@
       var sanitize = function (value, key, object) {
         // Iterate over each sanitization function and return a single value.
         fns.every(function (fn) {
-          value = fn(value, key, object);
+          value = fn(value, key, object, configs);
 
           // Break when the value returns `null`.
           return value != null;
@@ -114,8 +178,8 @@
         // Immediately return empty values with attempting to sanitize.
         if (isEmpty(value)) {
           // Fallback to providing the default value instead.
-          if (config.default != null) {
-            return sanitization(config.default, key, object);
+          if (config["default"] != null) {
+            return sanitization(config["default"], key, object);
           }
 
           // Return an empty array for repeatable values.
@@ -172,6 +236,20 @@
     };
   };
 
+  var TYPES = {
+    string:          String,
+    number:          toNumber,
+    integer:         toInteger,
+    'boolean':       toBoolean,
+    date:            toDate,
+    'date-only':     toDate,
+    'time-only':     toDate,
+    'datetime-only': toDate,
+    'datetime':      toDate,
+    object:          returnValue,
+    union:           toUnion
+  };
+
   /**
    * Every time the module is exported and executed, we return a new instance.
    *
@@ -189,7 +267,7 @@
 
       // Map each parameter in the schema to a validation function.
       Object.keys(schema).forEach(function (param) {
-        var config = schema[param];
+        var config = convertType(schema[param]);
         var types  = sanitize.TYPES;
         var rules  = sanitize.RULES;
 
@@ -230,13 +308,7 @@
      *
      * @type {Object}
      */
-    sanitize.TYPES = {
-      string:  String,
-      number:  toNumber,
-      integer: toInteger,
-      boolean: toBoolean,
-      date:    toDate
-    };
+    sanitize.TYPES = TYPES;
 
     /**
      * Provide sanitization based on rules.
